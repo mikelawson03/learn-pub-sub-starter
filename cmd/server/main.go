@@ -28,11 +28,15 @@ func main() {
 		return
 	}
 
-	_, queue, err := pubsub.DeclareAndBind(conn, routing.ExchangePerilTopic, "game_logs", "game_logs.*", pubsub.SimpleQueueDurable)
 	if err != nil {
-		log.Fatalf("could not subscribe to pause: %v", err)
+		fmt.Println("Error creating new sub channel: ", err)
+		return
 	}
-	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
+
+	err = pubsub.SubscribeGob(conn, routing.ExchangePerilTopic, "game_logs", "game_logs.*", pubsub.SimpleQueueDurable, handlerLogs())
+	if err != nil {
+		log.Fatalf("could not subscribe to queue: %v", err)
+	}
 
 	gamelogic.PrintServerHelp()
 

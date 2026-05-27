@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
@@ -29,12 +31,8 @@ func main() {
 
 	state := gamelogic.NewGameState(username)
 
+	// subscribe to Pause Queue
 	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilDirect, fmt.Sprintf("%v.%v", routing.PauseKey, username), routing.PauseKey, pubsub.SimpleQueueTransient, handlerPause(state))
-	if err != nil {
-		log.Fatalf("Error subscribing to queue: %v", err)
-	}
-
-	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilTopic, fmt.Sprintf("army_moves.%v", username), "army_moves.*", pubsub.SimpleQueueTransient, handlerMove(state))
 	if err != nil {
 		log.Fatalf("Error subscribing to queue: %v", err)
 	}
@@ -43,6 +41,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error creating pub channel: %v", err)
 	}
+
+	// subscribe to Move Queue
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilTopic, fmt.Sprintf("army_moves.%v", username), "army_moves.*", pubsub.SimpleQueueTransient, handlerMove(state, pubChannel))
+	if err != nil {
+		log.Fatalf("Error subscribing to queue: %v", err)
+	}
+
+	// subscribe to War Queue
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilTopic, "war", fmt.Sprintf("%s.*", routing.WarRecognitionsPrefix), pubsub.SimpleQueueDurable, handlerConsumeWarMessage(state, pubChannel))
 
 	for {
 		input := gamelogic.GetInput()
@@ -72,7 +79,23 @@ func main() {
 		case "help":
 			gamelogic.PrintClientHelp()
 		case "spam":
-			fmt.Println("Spamming not allowed yet!")
+			if len(input) < 2 {
+				fmt.Println("Please enter a value of to spam (e.g. spam 1000)")
+				continue
+			}
+			spamCount, err := strconv.Atoi(input[1])
+			if err != nil {
+				log.Fatalf("Error converting spam count to integer: %v", err)
+			}
+			for i := 0; i <= spamCount; i += 1 {
+				msg := gamelogic.GetMaliciousLog()
+				gl := routing.GameLog{
+					CurrentTime: time.Now(),
+					Message:     msg,
+					Username:    username,
+				}
+				pubsub.PublishGob(pubChannel, routing.ExchangePerilTopic, fmt.Sprintf("game_logs.%s", username), gl)
+			}
 		case "quit":
 			gamelogic.PrintQuit()
 			return
