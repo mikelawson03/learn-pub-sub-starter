@@ -28,11 +28,6 @@ func main() {
 		return
 	}
 
-	if err != nil {
-		fmt.Println("Error creating new sub channel: ", err)
-		return
-	}
-
 	err = pubsub.SubscribeGob(conn, routing.ExchangePerilTopic, "game_logs", "game_logs.*", pubsub.SimpleQueueDurable, handlerLogs())
 	if err != nil {
 		log.Fatalf("could not subscribe to queue: %v", err)
